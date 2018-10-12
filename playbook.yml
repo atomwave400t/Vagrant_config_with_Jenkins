@@ -1,37 +1,39 @@
 ---
 - hosts: all
+  become: yes
   tasks:
 
   - name: Jenkins Download
     command: wget https://pkg.jenkins.io/debian/binary/jenkins_2.144_all.deb -O /home/vagrant/jenkins.deb
 
-  - name: install daemon
-    command: sudo apt -y install daemon
-
-  - name: Install default-jre
-    command: sudo apt install -y default-jre
-
   - name: update
-    command: sudo apt -y update
+    command: apt -y update
 
   - name: upgrade
-    command: sudo apt -y upgrade
+    command: apt -y upgrade
 
-  - name: Install java 8
-    command: sudo apt install -y openjdk-8-jre-headless
+  - name: Add Oracle Java Repository
+    apt_repository: repo='ppa:webupd8team/java'
+
+  - name: Accept Java 8 License
+    debconf: name='oracle-java8-installer' question='shared/accepted-oracle-license-v1-1' value='true' vtype='select'
+
+  - name: Install Oracle Java 8 and essentials
+    become: yes
+    apt: name={{ java_needed }} state=latest
+    vars:
+      java_needed:
+        - daemon
+        - default-jre
+        - oracle-java8-installer
+        - ca-certificates
+        - oracle-java8-set-default
 
   - name: install jenkins
-    command: sudo dpkg -i /home/vagrant/jenkins.deb
-
-  - name: Security flag invert
-    command: sudo sed -i 's/<useSecurity>true<\/useSecurity>/<useSecurity>false<\/useSecurity>/g' /var/lib/jenkins/config.xml
-
-  - name: Jenkins service restart
-    service:
-      name: jenkins
-      command: restarted
+    command: dpkg -i /home/vagrant/jenkins.deb
 
   - name: Create Jenkins job with Jenkins CLI
     cron:
       minute: "0/5"
       job: "java -jar /usr/bin/jenkins-cli.jar -s http://127.0.0.1:8080/ create-job przykladowy_job"
+      user: vagrant
